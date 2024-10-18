@@ -1,0 +1,626 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+'use client';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { classNames } from 'primereact/utils';
+import { DataTable } from 'primereact/datatable';
+import { Divider } from 'primereact/divider';
+import { Calendar } from 'primereact/calendar';
+import { Button } from 'primereact/button';
+import { Toast } from 'primereact/toast';
+import { Column } from 'primereact/column';
+import { ColumnGroup } from 'primereact/columngroup';
+import { Row } from 'primereact/row';
+import { Dialog } from 'primereact/dialog';
+import { InputText } from 'primereact/inputtext';
+import { InputMask } from 'primereact/inputmask';
+// IMPORT FROM SQL
+import { minilab, minilabUpdate } from "../../../api/ens"
+
+
+import MlData from '../../../api/mldata'
+
+
+const MlDataEmpty = [
+    {
+        "mlbID": 'X',
+        "GroupId": null,
+        "mlbDate": null,
+        "mlbTime": null,
+        "mlbCod": null,
+        "mlbCodSa": null,
+        "mlbCodSb": null,
+        "mlbCodCL": null,
+        "mlbPb": null,
+        "mlbPbSa": null,
+        "mlbPbSb": null,
+        "mlbPbCL": null,
+        "mlbCu": null,
+        "mlbCuSa": null,
+        "mlbCuSb": null,
+        "mlbCuCL": null,
+        "mlbMn": null,
+        "mlbMnSa": null,
+        "mlbMnSb": null,
+        "mlbMnCL": null,
+        "mlbZn": null,
+        "mlbZnSa": null,
+        "mlbZnSb": null,
+        "mlbZnCL": null,
+        "mlbBoron": null,
+        "mlbBoronSa": null,
+        "mlbBoronSb": null,
+        "mlbBoronCL": null,
+        "mlbIron": null,
+        "mlbIronSa": null,
+        "mlbIronSb": null,
+        "mlbIronCL": null,
+        "mlbEnviLab": null,
+        "mlbInputDate": null,
+        "mlbInputUser": null,
+        "mlbUpdateDate": null,
+        "mlbUpdateUser": null,
+        "mlbParameter": null,
+        "CancelYN": "N"
+    }
+];
+
+const MlParameter = [
+    {
+        mlType: 'Cod',
+        mlSa: 80,
+        mlSb: 200,
+        mlCL: 140
+    },
+    {
+        mlType: 'Pb',
+        mlSa: 0.1,
+        mlSb: 0.5,
+        mlCL: 0.35
+    },
+    {
+        mlType: 'Cu',
+        mlSa: 0.2,
+        mlSb: 1,
+        mlCL: 0.7
+    },
+    {
+        mlType: 'Mn',
+        mlSa: 0.2,
+        mlSb: 1,
+        mlCL: 0.7
+    },
+    {
+        mlType: 'Zn',
+        mlSa: 1,
+        mlSb: 2,
+        mlCL: 1.4
+    },
+    {
+        mlType: 'Boron',
+        mlSa: 1,
+        mlSb: 4,
+        mlCL: 2.8
+    },
+    {
+        mlType: 'Iron',
+        mlSa: 1,
+        mlSb: 5,
+        mlCL: 3.5
+    }
+];
+
+const mlSaValues = MlParameter.map((item) => item.mlSa);
+const mlSbValues = MlParameter.map((item) => item.mlSb);
+const mlCLValues = MlParameter.map((item) => item.mlCL);
+
+const cGrey = { backgroundColor: 'var(--gray-100)' };
+const cPink = { backgroundColor: 'var(--pink-100)' };
+const cGreen = { backgroundColor: 'var(--green-100)' };
+const cOrange = { backgroundColor: 'var(--orange-100)' };
+const cPrimary = { backgroundColor: 'var(--primary-100)' };
+
+const MiniLab = () => {
+    //  ##################### Declaration variable ###############
+    const toast = useRef(null);
+    const dt = useRef(null);
+    const dtAPI = useRef(null);
+    const [date, setDate] = useState(null);
+    const [resultData, setResultData] = useState([]);
+    const [resultDataAPI, setResultDataAPI] = useState([]);
+    const [selectedRow, setSelectedRow] = useState(null);
+    const [selectedDeleteRow, setSelectedDeleteRow] = useState(null);
+    const [dataDialog, setDataDialog] = useState(MlDataEmpty);
+    const [dataDeleteDialog, setDataDeleteDialog] = useState(MlDataEmpty);
+    const [showDialog, setShowDialog] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+    const [deleteDialog, setDeleteDialog] = useState(false);
+    const [deletesDialog, setDeletesDialog] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+    const adjustMonth = '11'
+    const formattedDate = `${currentYear}${adjustMonth}`;
+    const formattedUser = ''
+    const formattedGroup = ''
+    
+
+    const createId = () => {
+        let id = '';
+        let chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 5; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return id;
+    };
+    const findIndexById = (id) => {
+        let index = -1;
+
+        for (let i = 0; i < resultData.length; i++) {
+            if (resultData[i].mlbID === id) {
+                index = i;
+                break;
+            }
+        }
+
+        return index;
+    };
+
+    const exportCSV = () => {
+        dt.current?.exportCSV();
+    };
+
+    // ##################### TOOLBAR UI ##########################
+    const SearchFormUI = () => {
+        return (
+            <React.Fragment>
+                <div className="grid">
+                    <div className="col-6">
+                        <div className="justify-content-left">
+                            Month : <Calendar value={date} onChange={(e) => setDate(e.value)} view="month" dateFormat="mm/yy" />
+                            <Button label="Search" outlined />
+                        </div>
+                    </div>
+                    <div className="col-6 ">
+                        <div className="text-right ">
+                            <Button label="New" icon="pi pi-plus" onClick={actionNew} severity="success" className="mr-2" raised />
+                            <Button label="Delete" icon="pi pi-trash" onClick={actionDeletes} severity="danger" disabled={!selectedRow || !selectedRow.length} className="mr-2" />
+                            <Button label="Export" icon="pi pi-file-export" severity="info" onClick={exportCSV}></Button>
+                        </div>
+                    </div>
+                </div>
+            </React.Fragment>
+        );
+    };
+
+    // ##################### DIALOG UI & UX ##########################
+    function getValueOrDefault(data, key, defaultValue) {
+        return data['0']?.[key] || data[key] || defaultValue;
+    }
+    const actionNew = () => {
+        setDataDialog(MlDataEmpty);
+        setSubmitted(false);
+        setShowDialog(true);
+    };
+    const actionEdit = (rowData) => {
+        // DO SOMETHING
+        let _dataDialogTemp = { ...rowData };
+        // console.log('_dataDialogTemp', _dataDialogTemp);
+        setDataDialog({ ..._dataDialogTemp });
+        setShowDialog(true);
+    };
+    const actionDelete = (rowData) => {
+        // DO SOMETHING
+        setDataDeleteDialog(rowData);
+        setDeleteDialog(true);
+    };
+    const actionDeletes = () => {
+        setDeletesDialog(true);
+    };
+    const actionSaveDialog = () => {
+        // console.log('actionSave');
+        setSubmitted(true);
+        let _resultDataTemp = [...resultDataAPI];
+        let _dataDialogTemp = { ...dataDialog };
+
+        let _mlbDate = getValueOrDefault(dataDialog, 'mlbDate', '');
+        let _mlbTime = getValueOrDefault(dataDialog, 'mlbTime', '');
+
+
+        if (_mlbDate != '' && _mlbTime !='' ){            
+            if (dataDialog.mlbID) {
+                // console.log('edit');
+                handleEdit(_dataDialogTemp)
+                // console.log('_dataDialogTemp', _dataDialogTemp
+                // const index = findIndexById(dataDialog.mlbID);
+                // console.log('index', index)
+                // _resultDataTemp[index] = _dataDialogTemp;
+              
+            } else {
+                // console.log('add');
+                let _IDtemp = createId();
+                _resultDataTemp.push(_dataDialogTemp);
+               
+            }
+            setDataDialog(MlDataEmpty);
+            setShowDialog(false);
+        } else {
+            // NOTHING HAPPEN
+        }
+
+    };
+
+    const handleEdit = async () => {
+        try {
+            const result = await minilabUpdate(dataDialog);
+            if (result.returnValue===0) {
+                toast.current.show({ severity: 'success', summary: 'Successful', detail: 'Mini Lab Monitoring Updated', life: 3000 });
+                fetchAndSetData(formattedUser, formattedGroup, formattedDate)
+                
+            }
+        } catch (error) {
+            console.error('Error updating minilab:', error);
+            toast.current.show({ severity: 'warning', summary: 'Warning', detail: { error }, life: 3000 });
+        }
+    };
+
+    const actionDeleteDialog = () => {
+        let _resultData = resultData.filter((val) => val.mlId !== dataDeleteDialog.mlId);
+
+        setResultData(_resultData);
+        setDeleteDialog(false);
+        setDataDialog(MlDataEmpty);
+        toast.current.show({ severity: 'error', summary: 'Successful', detail: 'Date Deleted', life: 3000 });
+    };
+    const actionDeletesDialog = () => {
+        let _resultData = resultData.filter((val) => !selectedRow.includes(val));
+        setResultData(_resultData);
+        setDeletesDialog(false);
+        setSelectedRow(null);
+        toast.current.show({ severity: 'warn', summary: 'Successful', detail: 'Dates Deleted', life: 3000 });
+    };
+    const actionCloseDialog = () => {
+        setShowDialog(false);
+    };
+    const actionCloseDeleteDialog = () => {
+        setDeleteDialog(false);
+    };
+    const actionCloseDeletesDialog = () => {
+        setDeletesDialog(false);
+    };
+    const onInputChange = (e, name) => {
+        // console.log('e', e);
+        const val = (e.target && e.target.value) || '';
+        let _dataDialogTemp = { ...dataDialog };
+        _dataDialogTemp[`${name}`] = val;
+        setDataDialog(_dataDialogTemp);
+    };
+
+    const dialogFooter = (
+        <React.Fragment>
+            <Button label="Cancel" icon="pi pi-times" outlined severity="secondary" onClick={actionCloseDialog} />
+            <Button label="Save" icon="pi pi-check" severity="primary" onClick={actionSaveDialog} />
+        </React.Fragment>
+    );
+
+    const deleteDialogFooter = (
+        <React.Fragment>
+            <Button label="No" icon="pi pi-times" outlined onClick={actionCloseDeleteDialog} />
+            <Button label="Yes" icon="pi pi-check" severity="danger" onClick={actionDeleteDialog} />
+        </React.Fragment>
+    );
+    const deletesDialogFooter = (
+        <React.Fragment>
+            <Button label="No" icon="pi pi-times" outlined onClick={actionCloseDeletesDialog} />
+            <Button label="Yes" icon="pi pi-check" severity="danger" onClick={actionDeletesDialog} />
+        </React.Fragment>
+    );
+
+    // ##################### TABLE UI ##########################
+
+    const actionRowButton = (rowData) => {
+        return (
+            <React.Fragment>
+                <Button text icon="pi pi-pencil" severity="primary" onClick={() => actionEdit(rowData)} />
+                <Button text icon="pi pi-trash" severity="danger" onClick={() => actionDelete(rowData)} />
+            </React.Fragment>
+        );
+    };
+    const getMlTypeValues = (mlType) => {
+        const mlTypeObj = MlParameter.find((item) => item.mlType === mlType);
+        return mlTypeObj ? { [`${mlType}Sa`]: mlTypeObj.mlSa, [`${mlType}Sb`]: mlTypeObj.mlSb, [`${mlType}CL`]: mlTypeObj.mlCL } : {};
+    };
+
+    const formatColData = (value, mlType, mlTypeData) => {
+        const extractmlType = mlType.substring(2);
+
+        if (value === '0') {
+            return '-';
+        } else if (value === 'ND') {
+            return <div style={cGreen}>ND</div>;
+        } else if (value > mlTypeData[`${extractmlType}Sb`]) {
+            return <div style={cPink}>{value}</div>;
+        } else if (value > mlTypeData[`${extractmlType}Cl`]) {
+            return <div>{value}</div>;
+        } else if (value > mlTypeData[`${extractmlType}Sa`]) {
+            return <div>{value}</div>;
+        } else {
+            if (isNaN(value)) {
+                return <div style={cOrange}>{value}</div>;
+            } else {
+                return <div>{value}</div>;
+            }
+        }
+    };
+
+    const formatBodyColumn = (rowData, column, mlType) => {
+        let value = rowData[column];
+        return formatColData(value, column, mlType);
+    };
+
+    const mlTypeCod = getMlTypeValues('Cod');
+    const mlTypePb = getMlTypeValues('Pb');
+    const mlTypeCu = getMlTypeValues('Cu');
+    const mlTypeMn = getMlTypeValues('Mn');
+    const mlTypeZn = getMlTypeValues('Zn');
+    const mlTypeBoron = getMlTypeValues('Boron');
+    const mlTypeIron = getMlTypeValues('Iron');
+
+    const colCod = (rowData) => formatBodyColumn(rowData, 'mlCod', mlTypeCod);
+    const colPb = (rowData) => formatBodyColumn(rowData, 'mlPb', mlTypePb);
+    const colCu = (rowData) => formatBodyColumn(rowData, 'mlCu', mlTypeCu);
+    const colMn = (rowData) => formatBodyColumn(rowData, 'mlMn', mlTypeMn);
+    const colZn = (rowData) => formatBodyColumn(rowData, 'mlZn', mlTypeZn);
+    const colBoron = (rowData) => formatBodyColumn(rowData, 'mlBoron', mlTypeBoron);
+    const colIron = (rowData) => formatBodyColumn(rowData, 'mlIron', mlTypeIron);
+
+
+    const colDate = (rowData) => {
+        const _mlbDate = rowData.mlbDate;
+
+        const year = _mlbDate.substring(0, 4);
+        const month = _mlbDate.substring(4, 6);
+        const day = _mlbDate.substring(6, 8);
+
+        const formattedDate = `${day}/${month}/${year}`;
+
+        return <div>{formattedDate}</div>;
+
+    }
+
+    const tableHeaderAPI = (
+        <ColumnGroup>
+            <Row>
+                <Column selectionMode="multiple" rowSpan={2} headerStyle={{ width: '10px' }}></Column>
+                <Column header="Date" field="mlbDate" rowSpan={2} colSpan={1} sortable />
+                <Column header="Paramameter (mg/L)" colSpan={7} className="text-center" />
+                <Column rowSpan={2} headerStyle={{ width: '15px' }}></Column>
+            </Row>
+
+            <Row>
+                <Column header="COD"></Column>
+                <Column header="Pb"></Column>
+                <Column header="Cu"></Column>
+                <Column header="Mn"></Column>
+                <Column header="Zn"></Column>
+                <Column header="Boron"></Column>
+                <Column header="Iron" className="text-center"></Column>
+            </Row>
+        </ColumnGroup>
+    );
+
+    // const tableHeader = (
+    //     <ColumnGroup>
+    //         <Row>
+    //             <Column selectionMode="multiple" rowSpan={2} headerStyle={{ width: '10px' }}></Column>
+    //             <Column header="Date" field="mlDate" rowSpan={2} colSpan={1} sortable />
+    //             <Column header="Paramameter (mg/L)" colSpan={7} className="text-center" />
+    //             <Column rowSpan={2} headerStyle={{ width: '15px' }}></Column>
+    //         </Row>
+
+    //         <Row>
+    //             <Column header="COD"></Column>
+    //             <Column header="Pb"></Column>
+    //             <Column header="Cu"></Column>
+    //             <Column header="Mn"></Column>
+    //             <Column header="Zn"></Column>
+    //             <Column header="Boron"></Column>
+    //             <Column header="Iron" className="text-center"></Column>
+    //         </Row>
+    //     </ColumnGroup>
+    // );
+
+    const tableFooter = (
+        <ColumnGroup>
+            {/* <Row>
+                <Column rowSpan={3}></Column>
+                <Column key="dataSA" footer="Std A" style={cGrey}></Column>
+                {mlSaValues.map((value, index) => (
+                    <Column key={index} footer={value} style={cGrey} className="text-center"></Column>
+                ))}
+                <Column rowSpan={3}></Column>
+            </Row>
+            <Row>
+                <Column key="dataSB" footer="Std B" style={cPink}></Column>
+                {mlSbValues.map((value, index) => (
+                    <Column key={index} footer={value} style={cPink} className="text-center"></Column>
+                ))}
+            </Row>
+            <Row>
+                <Column key="dataCL" footer="CL" style={cGreen}></Column>
+                {mlCLValues.map((value, index) => (
+                    <Column key={index} footer={value} style={cGreen} className="text-center"></Column>
+                ))}
+            </Row> */}
+        </ColumnGroup>
+    );
+
+
+    // #################### FUNCTION
+
+    const fetchAndSetData = async (InputUser, GroupId, ToDate) => {
+        setLoading(true)
+        try {
+            const result = await minilab(InputUser, GroupId, ToDate);
+            // console.log('result', result.data)
+            setResultDataAPI(result.data);
+        } catch (error) {
+            console.error(`Error fetching data for ${ToDate}:`, error);
+            setResultDataAPI(null);
+        } finally {
+            setLoading(false); // Set loading to false when data fetching is complete
+        }
+    };
+
+    // const SavData = async (InputUser, GroupId, ToDate) => {
+    //     try {
+    //         const result = await minilabSave(InputUser, GroupId, ToDate);
+    //         console.log('result', result)
+    //         setResultDataAPI(result);
+    //     } catch (error) {
+    //         console.error(`Error fetching data for ${ToDate}:`, error);
+    //         setResultDataAPI(null);
+    //     } finally {
+    //         // setLoading(false); // Set loading to false when data fetching is complete
+    //     }
+    // };
+
+
+    // ##################### END TABLE UI ##########################
+    useEffect(() => {
+        // setResultData(MlData);
+        fetchAndSetData(formattedUser, formattedGroup, formattedDate)
+
+        // console.log('data', resultData);
+    },[]);
+    return (
+        <div className="grid">
+            <Toast ref={toast} />
+            <div className="col-12">
+                <div className="card">
+                    <h5>Mini Lab Monitoring</h5>
+                    <SearchFormUI />
+                    <DataTable
+                        loading={loading}
+                        ref={dtAPI}
+                        dataKey="mlbID"
+                        value={resultDataAPI}
+                        headerColumnGroup={tableHeaderAPI}
+                        footerColumnGroup={tableFooter}
+                        selection={selectedRow}
+                        onSelectionChange={(e) => setSelectedRow(e.value)}
+                        resizableColumns
+                        showGridlines
+                        stripedRows
+                        size={'small'}
+                        emptyMessage="No monitoring found."
+                        className="datatable-responsive"
+                        tableStyle={{ minWidth: '50rem' }}
+                    >
+                        <Column selectionMode="multiple" exportable={false} className="text-center"></Column>
+                        <Column body={colDate} header="Date" field="mlbDate" sortable></Column>
+                        <Column header="COD" field="mlbCod" sortable></Column>
+                        <Column header="Pb" field="mlbPb" sortable></Column>
+                        <Column header="Cu" field="mlbCu" sortable></Column>
+                        <Column header="Mn" field="mlbMn" sortable></Column>
+                        <Column header="Zn" field="mlbZn" sortable></Column>
+                        <Column header="Boron" field="mlbBoron" sortable></Column>
+                        <Column header="Iron" field="mlbIron" sortable></Column>
+
+                        <Column body={actionRowButton} exportable={false}></Column>
+                    </DataTable>
+
+                    {/* ################# RECORD DIALOG ################# */}
+                    <Dialog header="Record : Mini Lab Monitoring" visible={showDialog} onHide={actionCloseDialog} footer={dialogFooter} modal maximizable style={{ width: '75vw' }} breakpoints={{ '960px': '75vw', '641px': '100vw' }}>
+                        <div className="formgrid grid">
+                            <div className="field col-6">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlbDate">Date *(dd/mm/yyyy)</label>
+                                    <InputMask id="mlbDate" mask="9999/99/99" placeholder="yyyy/mm/dd" value={dataDialog.mlbDate} required className={classNames({ 'p-invalid': !dataDialog.mlbDate })} onChange={(e) => onInputChange(e, 'mlbDate')} />
+                                </div>
+                            </div>
+                            <div className="field col-6">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlTime">Time *(24Hour)</label>
+                                    <InputMask id="mlTime" mask="99:99" placeholder="hh:mm" value={dataDialog.mlbTime} required className={classNames({ 'p-invalid': !dataDialog.mlbTime })} onChange={(e) => onInputChange(e, 'mlbTime')} />
+                                    {/* <Calendar id="idate" timeOnly hourFormat="24" /> */}
+                                </div>
+                            </div>
+                            <div className="field col-3">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlbCod">COD</label>
+                                    <InputText id="mlbCod" value={dataDialog.mlbCod} onChange={(e) => onInputChange(e, 'mlbCod')} />
+                                    {/* <InputText id="mlCod"  value={dataDialog.mlCod} onChange={(e) =>setDataDialog[.]mlCod = e.target.value} /> */}
+                                    {/* <InputMask id="mlCod" value={dataDialog.mlCod} onChange={(e) => console.log('zn', e)} /> */}
+                                </div>
+                            </div>
+                            <div className="field col-3">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlbPb">Pb</label>
+                                    <InputText id="mlbPb" value={dataDialog.mlbPb} onChange={(e) => onInputChange(e, 'mlbPb')} />
+                                </div>
+                            </div>
+                            <div className="field col-3">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlbCu">Cu</label>
+                                    <InputText id="mlbCu" value={dataDialog.mlbCu} onChange={(e) => onInputChange(e, 'mlbCu')} />
+                                </div>
+                            </div>
+                            <div className="field col-3">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlbMn">Mn</label>
+                                    <InputText id="mlbMn" value={dataDialog.mlbMn} onChange={(e) => onInputChange(e, 'mlbMn')} />
+                                </div>
+                            </div>
+                            <div className="field col-3">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlbZn">Zn</label>
+                                    <InputText id="mlbZn" value={dataDialog.mlbZn} onChange={(e) => onInputChange(e, 'mlbZn')} />
+                                </div>
+                            </div>
+                            <div className="field col-3">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlbBoron">Boron</label>
+                                    <InputText id="mlbBoron" value={dataDialog.mlbBoron} onChange={(e) => onInputChange(e, 'mlbBoron')} />
+                                </div>
+                            </div>
+                            <div className="field col-3">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlbEnviLab">EnviLab Boron</label>
+                                    <InputText id="mlbEnviLab" value={dataDialog.mlbEnviLab} onChange={(e) => onInputChange(e, 'mlbEnviLab')} />
+                                </div>
+                            </div>
+                            <div className="field col-3">
+                                <div className="flex flex-column">
+                                    <label htmlFor="mlbIron">Iron</label>
+                                    <InputText id="mlbIron" value={dataDialog.mlbIron} onChange={(e) => onInputChange(e, 'mlbIron')} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="formgrid grid"></div>
+                    </Dialog>
+                    {/* ################# SINGLE DELETE DIALOG ################# */}
+                    <Dialog visible={deleteDialog} style={{ width: '32rem' }} breakpoints={{ '960px': '75vw', '641px': '90vw' }} header="Confirm" modal footer={deleteDialogFooter} onHide={actionCloseDeleteDialog}>
+                        <div className="confirmation-content">
+                            <i className="pi pi-exclamation-triangle mr-3" style={{ fontSize: '2rem' }} />
+                            {dataDeleteDialog && <span>Are you sure you want to delete ? {dataDeleteDialog.mlDate}</span>}
+                        </div>
+                    </Dialog>
+                    {/* ################# MANY DELETE DIALOG################# */}
+                    <Dialog visible={deletesDialog} style={{ width: '32rem' }} breakpoints={{ '960px': '75vw', '641px': '90vw' }} header="Confirm" modal footer={deletesDialogFooter} onHide={actionCloseDeletesDialog}>
+                        <div className="confirmation-content">
+                            <i className="pi pi-exclamation-triangle mr-3" style={{ fontSize: '2rem' }} />
+                            {selectedRow && <span>Are you sure you want to delete the selected dates?</span>}
+                        </div>
+                    </Dialog>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+export default MiniLab;
